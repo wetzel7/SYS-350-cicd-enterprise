@@ -2,7 +2,7 @@
 
 Student: lsavage (Student A, host ports 3000-3012)
 
-This repo pushes the enterprise-build Terraform config through
+Every push to cicd-enterprise runs the enterprise-build Terraform config through
 lint -> validate -> plan -> policy -> gated apply -> smoke tests.
 
 ## Stack
