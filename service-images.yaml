@@ -1,0 +1,9 @@
+# service-images.yaml: the contract each image must satisfy
+# images keys  = vms map key suffix (the profile: win11, win2025)
+# services keys = the docker_container.service for_each key
+images:
+  win11:   { version: "11",   ram_min: "4G", cpu_min: 2, kvm: true, ports: [3389, 8006] }
+  win2025: { version: "2025", ram_min: "2G", cpu_min: 2, kvm: true, ports: [3389, 8006] }
+services:
+  gitea:  { kvm: false, ports: [3000] }
+  apache: { kvm: false, ports: [80] }
