@@ -21,6 +21,7 @@ vms = {
     os          = "win11"
     rdp_port    = 3002
     viewer_port = 3003
+    memory_mb   = 2048
   }
   "lsavage-win2025" = {
     os          = "win2025"
