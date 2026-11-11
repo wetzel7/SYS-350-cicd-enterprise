@@ -35,3 +35,20 @@ jobs:
 
       - name: Validate configuration
         run: terraform validate -no-color
+
+      - name: Plan
+        # The saved plan is a record of what this commit proposes, not an input
+        # to the deploy job. The deploy job plans again on its own machine
+        # against its own state.
+        run: |
+          terraform plan -no-color -input=false -out=tfplan
+          terraform show -json tfplan > plan.json
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan
+          path: plan.json
+
+      - name: Policy tests
+        run: bash policies/check.sh plan.json service-images.yaml
