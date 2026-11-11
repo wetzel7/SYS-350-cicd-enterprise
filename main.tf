@@ -113,7 +113,7 @@ locals {
 resource "docker_network" "segment" {
   for_each = toset(var.networks)
 
-  name   = "${var.student_nam}-${each.value}-net"
+  name   = "${var.student_name}-${each.value}-net"
   driver = "bridge"
 }
 
