@@ -52,3 +52,108 @@ jobs:
 
       - name: Policy tests
         run: bash policies/check.sh plan.json service-images.yaml
+
+  services-test:
+    # The gitea + apache lane: these images run fine on GitHub runners, which
+    # is why the lab tests them here.
+    runs-on: ubuntu-latest
+    env:
+      # Must match student_name in ci/github-services.tfvars
+      TF_VAR_student_name: "ci"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.17.0"
+          terraform_wrapper: false
+
+      - name: Initialize
+        run: terraform init -input=false
+
+      - name: Apply test services
+        # vms = {} in that file keeps the dockur containers out of this lane
+        run: terraform apply -input=false -auto-approve -var-file=ci/github-services.tfvars
+
+      - name: Service smoke tests
+        run: bash tests/smoke.sh "$TF_VAR_student_name" services
+
+      - name: Cleanup
+        # Throwaway lane: if destroy fails the runner VM is discarded anyway
+        if: always()
+        run: terraform destroy -input=false -auto-approve -var-file=ci/github-services.tfvars
+
+      - name: Collect service evidence
+        if: failure()
+        run: |
+          mkdir -p svc-evidence
+          for c in ci-gitea ci-apache; do
+            docker inspect "$c" > "svc-evidence/$c.inspect" 2>&1 || true
+            docker logs --tail 200 "$c" > "svc-evidence/$c.log" 2>&1 || true
+          done
+
+      - name: Upload service evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: service-evidence
+          path: svc-evidence
+
+  deploy:
+    needs: [check, services-test]
+    # Pull requests check only: only a push can reach the approval gate and the
+    # machine that runs the Windows VM containers
+    if: github.event_name == 'push'
+    # runs-on is a label match: the self-hosted runner on the student's own
+    # machine carries the custom label "local". That machine owns the Docker
+    # daemon with /dev/kvm and sends the run state back to GitHub.
+    runs-on: [self-hosted, local]
+    # Required-reviewer approval gate. Create it once with
+    # gh api --method PUT repos/{owner}/{repo}/environments/enterprise-build --input -
+    # listing yourself as reviewer, with prevent_self_review false.
+    environment: enterprise-build
+    steps:
+      - name: Check out repository
+        # git clean -ffdx would delete terraform.tfstate from the persistent
+        # runner workspace and the next apply would recreate existing containers
+        uses: actions/checkout@v7
+        with:
+          clean: false
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.17.0"
+          terraform_wrapper: false
+
+      - name: Initialize
+        run: terraform init -input=false
+
+      - name: Plan
+        # Local state, persistent infrastructure: "No changes" on a docs-only
+        # commit is the calm path
+        run: terraform plan -no-color -input=false -out=tfplan
+
+      - name: Apply
+        run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Smoke tests
+        run: bash tests/smoke.sh "$TF_VAR_student_name"
+
+      - name: Collect boot evidence
+        if: failure()
+        run: |
+          mkdir -p boot-evidence
+          for c in "$TF_VAR_student_name-win11" "$TF_VAR_student_name-win2025" "$TF_VAR_student_name-gitea" "$TF_VAR_student_name-apache"; do
+            docker inspect "$c" > "boot-evidence/$c.inspect" 2>&1 || true
+            docker logs --tail 200 "$c" > "boot-evidence/$c.log" 2>&1 || true
+          done
+
+      - name: Upload boot evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-evidence
+          path: boot-evidence
