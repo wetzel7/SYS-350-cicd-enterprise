@@ -90,7 +90,7 @@ locals {
       disk_gb   = 64
     }
     win2025 = {
-      version   = "10"
+      version   = "2025"
       memory_mb = 4096
       vcpu      = 2
       disk_gb   = 64
@@ -167,6 +167,12 @@ resource "docker_container" "windows" {
     "CPU_CORES=${each.value.cpus}",
     "DISK_SIZE=${each.value.disk}",
   ]
+
+  devices {
+    host_path      = "/dev/kvm"
+    container_path = "/dev/kvm"
+    permissions    = "rwm"
+  }
 
   devices {
     host_path      = "/dev/net/tun"
