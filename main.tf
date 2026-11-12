@@ -180,6 +180,10 @@ resource "docker_container" "windows" {
     permissions    = "rwm"
   }
 
+  capabilities {
+    add = ["CAP_NET_ADMIN"]
+  }
+
   ports {
     internal = 8006
     external = each.value.viewer_port
